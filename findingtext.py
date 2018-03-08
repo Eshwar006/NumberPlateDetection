@@ -6,60 +6,69 @@ http://blog.ayoungprogrammer.com/2013/01/equation-ocr-part-1-using-contours-to.h
 @author: eshwarmannuru
 """
 
-
 import cv2
 import numpy as np
+import sys
+
 
 def preprocessing(image):
-    blur = cv2.GaussianBlur(image, (3,3), 0)
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    blur = cv2.GaussianBlur(gray, (3,3), 0)
     th = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 75, 10)
+    th = cv2.bitwise_not(th)
     return th
 
-#Deskewing the text angle
-def deSkew(thresh, image):
+#Finding skew angle
+def skew_angle(thresh):
     coords = np.column_stack(np.where(thresh > 0))
-    cv2.imshow('coords', coords)
-    rect  = cv2.minAreaRect(coords)
-    box = cv2.cv.BoxPoints(rect)
-    box = np.int0(box)
-    
-    cv2.drawContours(image, [box], 0, (0, 255, 255))
-    print(rect[2])
-    angle = rect[2]
+    angle = cv2.minAreaRect(coords)[-1]
     if angle < -45:
         angle = -(90 + angle)
     else:
         angle = -angle
-    (h, w) = image.shape[:2]
-    print(w,h)
+    (h, w) = thresh.shape[:2]
     center = (w // 2, h // 2)
-    size = (int(rect[1][1]), int(rect[1][0]))
     M = cv2.getRotationMatrix2D(center, angle, 1.0)
-    rotated = cv2.warpAffine(image, M, (w, h),flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
-    cropped = cv2.getRectSubPix(image, size, center)
-    cv2.imshow('Cropped', cropped)
+    rotated = cv2.warpAffine(thresh, M, (w, h),flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+    #cropped = cv2.getRectSubPix(rotated, size, center)
+    #cv2.imshow('Cropped', cropped)
     #cv2.putText(rotated, "Angle: {:.2f} degrees".format(angle),(10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
     return angle, rotated
 
+#Deskew the text and crop 
+#def deskew(image):
+
+
+
+def contour_extraction(cropped, image):
+    contours, hierarchy = cv2.findContours(cropped, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    #cv2.drawContours(cropped, contours, -1, (0,255,0), 3)
+    size = image.shape[:2]
+    H = size[0]
+    W = size[1]
+    for (i,c) in enumerate(contours):
+        (x,y,w,h) = cv2.boundingRect(c)
+        #print(x,y,w,h)
+        if w < W/4 and w*h < image.size/4 and w > W/20 and h > H/20:
+            cv2.rectangle(image, (x,y), (x+w,y+h), (0, 255, 0), 1)
 
 
 #Read image
-originalimage = cv2.imread('2.jpeg',0)
-thresholdedimage = preprocessing(originalimage)
-angle, rotated = deSkew(thresholdedimage, originalimage)
+def function(path):
+    originalimage = cv2.imread(path)
+    thresholdedimage = preprocessing(originalimage)
 
-print(angle)
-cv2.imshow('thresh', thresholdedimage)
-cv2.imshow('Original Image',originalimage)
-#cv2.imshow('rotated', rotated)
+    #cv2.imshow('thresholded image', thresholdedimage)
 
+    angle, cropped = skew_angle(thresholdedimage)
+    contour_extraction(cropped, originalimage)
 
+    cv2.imshow('Extracted image', originalimage)
+    #cv2.imshow('thresh1', th1)
 
-#th1 = cv2.bitwise_not(image, th)
+path = sys.argv[1]
 
-
-#cv2.imshow('thresh1', th1)
-
+function(path)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
 

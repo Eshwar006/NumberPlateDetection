@@ -9,7 +9,7 @@ http://blog.ayoungprogrammer.com/2013/01/equation-ocr-part-1-using-contours-to.h
 import cv2
 import numpy as np
 import sys
-
+import os
 
 def preprocessing(image):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -40,35 +40,53 @@ def skew_angle(thresh):
 
 
 
-def contour_extraction(cropped, image):
+def contour_extraction(cropped, image, op):
     contours, hierarchy = cv2.findContours(cropped, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     #cv2.drawContours(cropped, contours, -1, (0,255,0), 3)
     size = image.shape[:2]
     H = size[0]
     W = size[1]
+    if not os.path.exists(op):
+        os.makedirs(op)
+
+    k = 0
     for (i,c) in enumerate(contours):
         (x,y,w,h) = cv2.boundingRect(c)
         #print(x,y,w,h)
         if w < W/4 and w*h < image.size/4 and w > W/20 and h > H/20:
+            k += 1
+            cv2.imwrite(op+"/"+str(k) + ".png", image[y:y+h, x:x+w])
             cv2.rectangle(image, (x,y), (x+w,y+h), (0, 255, 0), 1)
 
 
 #Read image
-def function(path):
-    originalimage = cv2.imread(path)
+def function(inputpath, outputpath):
+    print(inputpath, outputpath)
+    originalimage = cv2.imread(inputpath)
+
+    cv2.imshow('image', originalimage)
     thresholdedimage = preprocessing(originalimage)
 
     #cv2.imshow('thresholded image', thresholdedimage)
 
     angle, cropped = skew_angle(thresholdedimage)
-    contour_extraction(cropped, originalimage)
+    cv2.imshow('cropped', cropped)
+    contour_extraction(cropped, originalimage, outputpath)
 
     cv2.imshow('Extracted image', originalimage)
     #cv2.imshow('thresh1', th1)
 
 path = sys.argv[1]
+outputpath = sys.argv[2]
 
-function(path)
+file_count = len([f for f in os.walk(path).next()[2] if f[-4:] == ".png"])
+
+for i in range(file_count):
+    ip = path + "/" + str(i+1) +".png"
+    op = outputpath + "/" + str(i+1)
+    function(ip,op)
+
+
 cv2.waitKey(0)
 cv2.destroyAllWindows()
 

@@ -11,6 +11,7 @@ import numpy as np
 import sys
 import os
 
+
 def preprocessing(image):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     blur = cv2.GaussianBlur(gray, (3,3), 0)
@@ -37,103 +38,63 @@ def skew_angle(thresh):
 
 #Deskew the text and crop 
 #def deskew(image):
+def find_if_close(cnt1, cnt2):
+    row1, row2 = cnt1.shape[0], cnt2.shape[0]
+    for i in xrange(row1):
+        for j in xrange(row2):
+            dist = np.linalg.norm(cnt1[i] - cnt2[j])
+            if abs(dist) < 10:
+                return True
+            else:
+                return False
+            
 
-
-
-<<<<<<< HEAD
-def contour_extraction(cropped, image, outputpath):
-=======
-def contour_extraction(cropped, image, op):
->>>>>>> 9d8588fc1e2657c20836f9d2e3983880c652bf84
-    contours, hierarchy = cv2.findContours(cropped, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+def contour_extraction(cropped, image, op,k):
+    im2, contours, hierarchy = cv2.findContours(cropped, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     #cv2.drawContours(cropped, contours, -1, (0,255,0), 3)
     size = image.shape[:2]
     H = size[0]
     W = size[1]
-<<<<<<< HEAD
-    k  = 0
-    if not os.path.exists(outputpath):
-        os.makedirs(outputpath)
-    for (i,c) in enumerate(contours):
-        (x,y,w,h) = cv2.boundingRect(c)
-        #print(x,y,w,h)
-        if w < W/4 and w*h < image.size/4 and w > W/20:
-            k += 1
-            cv2.imwrite(outputpath + "/"+str(k)+".png", image[y:(y+h), x:(x+w)])
-=======
     if not os.path.exists(op):
         os.makedirs(op)
-
-    k = 0
+        
     for (i,c) in enumerate(contours):
         (x,y,w,h) = cv2.boundingRect(c)
         #print(x,y,w,h)
         if w < W/4 and w*h < image.size/4 and w > W/20 and h > H/20:
             k += 1
-            cv2.imwrite(op+"/"+str(k) + ".png", image[y:y+h, x:x+w])
->>>>>>> 9d8588fc1e2657c20836f9d2e3983880c652bf84
+            cv2.imwrite(op+"/"+str(k) + str(i) + ".png", image[y:y+h, x:x+w])
             cv2.rectangle(image, (x,y), (x+w,y+h), (0, 255, 0), 1)
             
 
 
 #Read image
-<<<<<<< HEAD
-def function(path, outputpath):
-    originalimage = cv2.imread(path)
-=======
-def function(inputpath, outputpath):
+def function(inputpath, outputpath,k):
     print(inputpath, outputpath)
     originalimage = cv2.imread(inputpath)
 
     cv2.imshow('image', originalimage)
->>>>>>> 9d8588fc1e2657c20836f9d2e3983880c652bf84
     thresholdedimage = preprocessing(originalimage)
-
     #cv2.imshow('thresholded image', thresholdedimage)
-
     angle, cropped = skew_angle(thresholdedimage)
-<<<<<<< HEAD
-    contour_extraction(cropped, originalimage, outputpath)
+    contour_extraction(cropped, originalimage, outputpath,k)
     print("Angle is ",angle)
-    cv2.imshow('cropped', cropped)
+    #cv2.imshow('cropped', cropped)
     cv2.imshow('Extracted image', originalimage)
     #cv2.imshow('thresh1', th1)
 
 def run():
     path = sys.argv[1]
     outputpath = sys.argv[2]
+    print(path, outputpath)
+    #file_count = len([f for f in os.walk(path).next()[2] if f[-4:] == ".png"])
+    #print(file_count)
     for i in range(20):
-        print("Preprocessing Image: ", i+1)
-        ip = path+"/" + str(i+1) + ".png"
-        op = outputpath + "/" + str(i+1)
-        print(ip)
-        function(ip, op)
+        ip = path + "/" + str(i+1) +".png"
+        #op = outputpath + "/" + str(i+1)
+        op = outputpath
+        function(ip,op,i)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
-    
 
-    
-
-=======
-    cv2.imshow('cropped', cropped)
-    contour_extraction(cropped, originalimage, outputpath)
-
-    cv2.imshow('Extracted image', originalimage)
-    #cv2.imshow('thresh1', th1)
-
-path = sys.argv[1]
-outputpath = sys.argv[2]
-
-file_count = len([f for f in os.walk(path).next()[2] if f[-4:] == ".png"])
-
-for i in range(file_count):
-    ip = path + "/" + str(i+1) +".png"
-    op = outputpath + "/" + str(i+1)
-    function(ip,op)
-
-
-cv2.waitKey(0)
-cv2.destroyAllWindows()
->>>>>>> 9d8588fc1e2657c20836f9d2e3983880c652bf84
-
-
+run()

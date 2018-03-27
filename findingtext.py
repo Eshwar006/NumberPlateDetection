@@ -34,20 +34,7 @@ def skew_angle(thresh):
     #cropped = cv2.getRectSubPix(rotated, size, center)
     #cv2.imshow('Cropped', cropped)
     #cv2.putText(rotated, "Angle: {:.2f} degrees".format(angle),(10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-    return angle, rotated
-
-#Deskew the text and crop 
-#def deskew(image):
-def find_if_close(cnt1, cnt2):
-    row1, row2 = cnt1.shape[0], cnt2.shape[0]
-    for i in xrange(row1):
-        for j in xrange(row2):
-            dist = np.linalg.norm(cnt1[i] - cnt2[j])
-            if abs(dist) < 10:
-                return True
-            else:
-                return False
-            
+    return angle, rotated            
 
 def contour_extraction(cropped, image, op,k):
     im2, contours, hierarchy = cv2.findContours(cropped, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -57,44 +44,99 @@ def contour_extraction(cropped, image, op,k):
     W = size[1]
     if not os.path.exists(op):
         os.makedirs(op)
-        
+    p = 0;
     for (i,c) in enumerate(contours):
         (x,y,w,h) = cv2.boundingRect(c)
         #print(x,y,w,h)
-        if w < W/4 and w*h < image.size/4 and w > W/20 and h > H/20:
-            k += 1
-            cv2.imwrite(op+"/"+str(k) + str(i) + ".png", image[y:y+h, x:x+w])
-            cv2.rectangle(image, (x,y), (x+w,y+h), (0, 255, 0), 1)
+        #if w < W/4 and w*h < image.size/4 and w > W/20 and h > H/20:
+            #cv2.imshow(str(k)+str(i), image[y:y+h, x:x+w])
+        p += 1
+        cv2.imwrite(op+"/"+str(p) + k , image[y:y+h, x:x+w])
+        cv2.rectangle(image, (x,y), (x+w,y+h), (0, 255, 0), 1)
             
-
+    cv2.imshow('Extracted image', image)
+    cv2.waitKey(0)
 
 #Read image
 def function(inputpath, outputpath,k):
     print(inputpath, outputpath)
-    originalimage = cv2.imread(inputpath)
+    originalimage = cv2.imread(inputpath + "/" + k)
 
     cv2.imshow('image', originalimage)
     thresholdedimage = preprocessing(originalimage)
     #cv2.imshow('thresholded image', thresholdedimage)
     angle, cropped = skew_angle(thresholdedimage)
     contour_extraction(cropped, originalimage, outputpath,k)
-    print("Angle is ",angle)
-    #cv2.imshow('cropped', cropped)
-    cv2.imshow('Extracted image', originalimage)
-    #cv2.imshow('thresh1', th1)
 
-def run():
-    path = sys.argv[1]
-    outputpath = sys.argv[2]
-    print(path, outputpath)
-    #file_count = len([f for f in os.walk(path).next()[2] if f[-4:] == ".png"])
-    #print(file_count)
-    for i in range(20):
-        ip = path + "/" + str(i+1) +".png"
-        #op = outputpath + "/" + str(i+1)
-        op = outputpath
-        function(ip,op,i)
-    cv2.waitKey(0)
+
+def function1(inputpath):
+      
+    image = cv2.imread(inputpath)
+    # Converting to gray image
+    img_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    # Noise removal using bilateral filter
+    noise_removal = cv2.bilateralFilter(img_gray, 9, 75, 75)
+    #Morphological opening using rectangular structure element
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5,5))
+    morph_image = cv2.morphologyEx(noise_removal, cv2.MORPH_OPEN, kernel, iterations = 15)
+    
+    # Image subtraction 
+    sub_morph = cv2.subtract(noise_removal, morph_image)
+    #cv2.imshow('Subtracted Image 6', sub_morph)
+    
+    #Thresholding image
+    ret, thresh_image = cv2.threshold(sub_morph, 0, 255, cv2.THRESH_OTSU)
+    #cv2.imshow('Thresh_image 7', thresh_image)
+    
+    #Applying canny edge detection
+    canny_image = cv2.Canny(thresh_image, 250, 255)
+    canny_image = cv2.convertScaleAbs(canny_image)
+    #cv2.imshow('Canny Image 8', canny_image)
+    
+    #Dilation to strengthen edges
+    kernel = np.ones((3,3), np.uint8)
+    dilated_image = cv2.dilate(canny_image, kernel, iterations=1)
+    #cv2.imshow('Dilated image 9', dilated_image)
+    
+    #Finding Contours in image based on edges
+    new,contours, hierarchy = cv2.findContours(dilated_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    contours= sorted(contours, key = cv2.contourArea, reverse = True)[:25]
+
+    size = image.shape[:2]
+    H = size[0]
+    W = size[1]
+    
+    # loop over our contours
+    for i,c in enumerate(contours):
+        peri = cv2.arcLength(c, True)
+        approx = cv2.approxPolyDP(c, 0.01* peri, True)
+        (x,y,w,h) = cv2.boundingRect(c)
+        if len(approx) == 4:
+            (x,y,w,h) = cv2.boundingRect(c)
+            #if w < W/2 and h < H:
+                #cv2.imshow(str(i), image[y:y+h, x:x+w])
+        if w < W and w*h < image.size/4:
+            cv2.rectangle(image, (x,y), (x+w,y+h), (0, 255, 0), 1)
+        #final = cv2.drawContours(image, [screenCnt], -1, (0, 255, 0), 3)
+        # Drawing the selected contour on the original image
+        #cv2.imshow("Image with Selected Contour",final)
+    
+    # Merging the 3 channels
+    cv2.imshow("Enhanced Number Plate",image)
+    # Display image
+    cv2.waitKey(0) # Wait for a keystroke from the user
+    cv2.destroyAllWindows()
+    
+def run(path, op):
+    for filename in os.listdir(path):
+        print(str(filename))
+        function(ip,op,filename)
     cv2.destroyAllWindows()
 
-run()
+ip = sys.argv[1]
+op = sys.argv[2]
+run(ip, op)
+#function1(path)
+
+
+
